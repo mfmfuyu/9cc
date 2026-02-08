@@ -71,7 +71,7 @@ Node *stmt()
 	}
 
 	if (!consume(";"))
-		error_at(0, "");
+		error_at(token->str, "';' expected.");
 
 	return node;
 }
