@@ -1,6 +1,10 @@
 #include "9cc.h"
 
+LVar *locals;
+
+Node *stmt();
 Node *expr();
+Node *assign();
 Node *equality();
 Node *relational();
 Node *mul();
@@ -30,10 +34,60 @@ Node *new_num(int val)
 	return node;
 }
 
+Node *new_assign(Node *lhs, Node *rhs)
+{
+	Node *node = new_node(ND_ASSIGN);
+	node->lhs = lhs;
+	node->rhs = rhs;
+	return node;
+}
+
+LVar *find_lvar(Token *tok)
+{
+	for (LVar *var = locals; var; var = var->next)
+		if (var->len == tok->len && !memcmp(tok->str, var->name, var->len))
+			return var;
+	return NULL;
+}
+
+void program() {
+	int i = 0;
+	while (!at_eof())
+		code[i++] = stmt();
+	code[i] = NULL;
+}
+
+// stmt = expr ";"
+Node *stmt()
+{
+	Node *node;
+
+	if (consume_token(TK_RETURN)) {
+		node = calloc(1, sizeof(Node));
+		node->kind = ND_RETURN;
+		node->lhs = expr();
+	} else {
+		node = expr();
+	}
+
+	if (!consume(";"))
+		error_at(0, "");
+
+	return node;
+}
+
 // expr = equality
 Node *expr()
 {
-	return equality();
+	return assign();
+}
+
+Node *assign()
+{
+	Node *node = equality();
+	if (consume("="))
+		node = new_assign(node, assign());
+	return node;
 }
 
 // equality = relational ("==" relational | "!=" relational)*
@@ -111,12 +165,33 @@ Node *unary()
 	return primary();
 }
 
-// primary = "(" expr ")" | num
+// primary = "(" expr ")" | num | ident
 Node *primary()
 {
 	if (consume("(")) {
 		Node *node = expr();
 		expect(")");
+		return node;
+	}
+
+	Token *tok = consume_token(TK_IDENT);
+	if (tok) {
+		Node *node = calloc(1, sizeof(Node));
+		node->kind = ND_LVAR;
+
+		LVar *lvar = find_lvar(tok);
+		if (lvar) {
+			node->offset = lvar->offset;
+		} else {
+			lvar = calloc(1, sizeof(LVar));
+			lvar->next = locals;
+			lvar->name = tok->str;
+			lvar->len = tok->len;
+			lvar->offset = locals ? locals->offset + 8 : 8;
+			node->offset = lvar->offset;
+			locals = lvar;
+		}
+
 		return node;
 	}
 

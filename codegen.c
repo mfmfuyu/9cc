@@ -1,9 +1,41 @@
 #include "9cc.h"
 
+void codegen_lval(Node *node)
+{
+	if (node->kind != ND_LVAR)
+		error("");
+
+	printf("	mov rax, rbp\n");
+	printf("	sub rax, %d\n", node->offset);
+	printf("	push rax\n");
+}
+
 void codegen(Node *node)
 {
 	if (node->kind == ND_NUM) {
 		printf("	push %d\n", node->val);
+		return;
+	} else if (node->kind == ND_LVAR) {
+		codegen_lval(node);
+		printf("	pop rax\n");
+		printf("	mov rax, [rax]\n");
+		printf("	push rax\n");
+		return;
+	} else if (node->kind == ND_ASSIGN) {
+		codegen_lval(node->lhs);
+		codegen(node->rhs);
+
+		printf("	pop rdi\n");
+		printf("	pop rax\n");
+		printf("	mov [rax], rdi\n");
+		printf("	push rdi\n");
+		return;
+	} else if (node->kind == ND_RETURN) {
+		codegen(node->lhs);
+		printf("	pop rax\n");
+		printf("	mov rsp, rbp\n");
+		printf("	pop rbp\n");
+		printf("	ret\n");
 		return;
 	}
 

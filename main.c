@@ -2,6 +2,7 @@
 
 char *user_input;
 Token *token;
+Node *code[100];
 
 int main(int argc, char **argv)
 {
@@ -12,15 +13,19 @@ int main(int argc, char **argv)
 
 	user_input = argv[1];
 	token = tokenize();
-	Node *node = expr();
+	program();
 
 	printf(".intel_syntax noprefix\n");
 	printf(".globl main\n");
 	printf("main:\n");
 
-	codegen(node);
+	printf("	push rbp\n");
+	printf("	mov rbp, rsp\n");
+	printf("	sub rsp, 208\n");
 
-	printf("	pop rax\n");
-	printf("	ret\n");
+	for (int i = 0; code[i]; i++) {
+		codegen(code[i]);
+	}
+
 	return 0;
 }
