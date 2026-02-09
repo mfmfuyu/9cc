@@ -42,6 +42,13 @@ Node *new_assign(Node *lhs, Node *rhs)
 	return node;
 }
 
+Node *new_expr_stmt(Node *lhs)
+{
+	Node *node = new_node(ND_EXPR_STMT);
+	node->lhs = lhs;
+	return node;
+}
+
 LVar *find_lvar(Token *tok)
 {
 	for (LVar *var = locals; var; var = var->next)
@@ -62,12 +69,83 @@ Node *stmt()
 {
 	Node *node;
 
-	if (consume_token(TK_RETURN)) {
+	if (consume("{")) {
+		node = calloc(1, sizeof(Node));
+		node->kind = ND_BLOCK;
+
+		Node **cur = &node->block.stmts;
+
+		while (!consume("}")) {
+			*cur = stmt();
+			cur = &(*cur)->next;
+		}
+
+		return node;
+	} else if (consume_token(TK_RETURN)) {
 		node = calloc(1, sizeof(Node));
 		node->kind = ND_RETURN;
 		node->lhs = expr();
+
+		expect(";");
+
+		return node;
+	} else if (consume_token(TK_IF)) {
+		node = calloc(1, sizeof(Node));
+		node->kind = ND_IF;
+
+		expect("(");
+		node->if_stmt.cond = expr();
+		expect(")");
+
+		node->if_stmt.then = stmt();
+
+		if (consume_token(TK_ELSE))
+			node->if_stmt.els = stmt();
+
+		return node;
+	} else if (consume_token(TK_WHILE)) {
+		node = calloc(1, sizeof(Node));
+		node->kind = ND_WHILE;
+
+		expect("(");
+		node->while_stmt.cond = expr();
+		expect(")");
+
+		node->while_stmt.stmt = stmt();
+
+		return node;
+	} else if (consume_token(TK_FOR)) {
+		node = calloc(1, sizeof(Node));
+		node->kind = ND_FOR;
+
+		expect("(");
+
+		if (!consume(";")) {
+			node->for_stmt.clause = new_expr_stmt(expr());
+			expect(";");
+		} else {
+			node->for_stmt.clause = NULL;
+		}
+
+		if (!consume(";")) {
+			node->for_stmt.expression2 = expr();
+			expect(";");
+		} else {
+			node->for_stmt.expression2 = NULL;
+		}
+
+		if (!consume(")")) {
+			node->for_stmt.expression3 = new_expr_stmt(expr());
+			expect(")");
+		} else {
+			node->for_stmt.expression3 = NULL;
+		}
+
+		node->for_stmt.stmt = stmt();
+
+		return node;
 	} else {
-		node = expr();
+		node = new_expr_stmt(expr());
 	}
 
 	if (!consume(";"))

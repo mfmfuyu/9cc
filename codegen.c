@@ -10,6 +10,77 @@ void codegen_lval(Node *node)
 	printf("	push rax\n");
 }
 
+int label_count = 0;
+void codegen_if_stmt(Node *node)
+{
+	int id = label_count++;
+
+	codegen(node->if_stmt.cond);
+	printf("	pop rax");
+	printf("	cmp rax, 0\n");
+
+	if (node->if_stmt.els) {
+		printf("	je .Lelse%d\n", id);
+		codegen(node->if_stmt.then);
+		printf("	jmp .Lend%d\n", id);
+		printf(".Lelse%d:\n", id);
+		codegen(node->if_stmt.els);
+	} else {
+		printf("	je .Lend%d\n", id);
+		codegen(node->if_stmt.then);
+	}
+
+	printf(".Lend%d:\n", id);
+}
+
+void codegen_while_stmt(Node *node)
+{
+	int id = label_count++;
+
+	printf(".Lbegin%d:\n", id);
+	codegen(node->while_stmt.cond);
+	printf("	pop rax\n");
+	printf("	cmp rax, 0\n");
+	printf("	je .Lend%d\n", id);
+	codegen(node->while_stmt.stmt);
+	printf("	jmp .Lbegin%d\n", id);
+	printf(".Lend%d\n:", id);
+}
+
+void codegen_for_stmt(Node *node)
+{
+	int id = label_count++;
+
+	if (node->for_stmt.clause)
+		codegen(node->for_stmt.clause);
+
+	printf(".Lbegin%d:\n", id);
+
+	if (node->for_stmt.expression2) {
+		codegen(node->for_stmt.expression2);
+
+		printf("	pop rax\n");
+		printf("	cmp rax, 0\n");
+		printf("	je .Lend%d\n", id);
+	}
+
+	if (node->for_stmt.stmt)
+		codegen(node->for_stmt.stmt);
+
+	if (node->for_stmt.expression3)
+		codegen(node->for_stmt.expression3);
+
+	printf("	jmp .Lbegin%d\n", id);
+
+	printf(".Lend%d:\n", id);
+}
+
+void codegen_block(Node *node)
+{
+	for (Node *n = node->block.stmts; n; n = n->next)
+		codegen(n);
+}
+
 void codegen(Node *node)
 {
 	if (node->kind == ND_NUM) {
@@ -36,6 +107,22 @@ void codegen(Node *node)
 		printf("	mov rsp, rbp\n");
 		printf("	pop rbp\n");
 		printf("	ret\n");
+		return;
+	} else if (node->kind == ND_IF) {
+		codegen_if_stmt(node);
+		return;
+	} else if (node->kind == ND_WHILE) {
+		codegen_while_stmt(node);
+		return;
+	} else if (node->kind == ND_FOR) {
+		codegen_for_stmt(node);
+		return;
+	} else if (node->kind == ND_BLOCK) {
+		codegen_block(node);
+		return;
+	} else if (node->kind == ND_EXPR_STMT) {
+		codegen(node->lhs);
+		printf("	pop rax\n");
 		return;
 	}
 
